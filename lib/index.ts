@@ -22,6 +22,7 @@ export interface ICompilerOptions {
   format?: "ts" | "js:esm" | "js:cjs"
   ignoreGenerics?: boolean;
   ignoreIndexSignature?: boolean;
+  ignoreIndexAccessType?: boolean;
   inlineImports?: boolean;
 }
 
@@ -95,6 +96,8 @@ export class Compiler {
       case ts.SyntaxKind.NeverKeyword: return '"never"';
       case ts.SyntaxKind.IndexSignature:
         return this._compileIndexSignatureDeclaration(node as ts.IndexSignatureDeclaration);
+      case ts.SyntaxKind.IndexedAccessType:
+        return this._compileIndexAccessTypeNode(node as ts.IndexedAccessTypeNode);
     }
     // Skip top-level statements that we haven't handled.
     if (ts.isSourceFile(node.parent!)) { return ""; }
@@ -262,6 +265,13 @@ export class Compiler {
     const type = this.compileNode(node.type);
     return `[t.indexKey]: ${type}`;
   }
+  private _compileIndexAccessTypeNode(node: ts.IndexedAccessTypeNode): string {
+    if (this.options.ignoreIndexAccessType) {
+      return ignoreNode;
+    }
+    throw new Error(`Node ${ts.SyntaxKind[node.kind]} not supported by ts-interface-builder: ` +
+      node.getText());
+  }
   private _formatExport(name: string, expression: string): string {
     return this.options.format === "js:cjs"
         ? `  ${name}: ${this.indent(expression)},`
@@ -305,6 +315,7 @@ export function main() {
   .option("--format <format>", `Format to use for output; options are 'ts' (default), 'js:esm', 'js:cjs'`)
   .option("-g, --ignore-generics", `Ignores generics`)
   .option("-i, --ignore-index-signature", `Ignores index signature`)
+  .option("--ignore-index-access-type", `Ignores index access types`)
   .option("--inline-imports", `Traverses the full import tree and inlines all types into output`)
   .option("-s, --suffix <suffix>", `Suffix to append to generated files (default ${defaultSuffix})`, defaultSuffix)
   .option("-o, --outDir <path>", `Directory for output files; same as source file if omitted`)
@@ -321,6 +332,7 @@ export function main() {
     format: commander.format || defaultFormat,
     ignoreGenerics: commander.ignoreGenerics,
     ignoreIndexSignature: commander.ignoreIndexSignature,
+    ignoreIndexAccessType: commander.ignoreIndexAccessType,
     inlineImports: commander.inlineImports,
   };
 
